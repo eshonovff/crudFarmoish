@@ -6,7 +6,7 @@ import Spinner from '../UI/Spinner'
 import Pagination from '../UI/Pagination'
 import Toast from '../UI/Toast'
 import { useFetchTasks, useCreateTask, useUpdateTask, useDeleteTask } from '../../hooks/useTasks'
-import { useTaskContext } from '../../store/TaskContext'
+import { useTaskStore } from '../../store/taskStore'
 import type { Task, ColumnId, Priority } from '../../types/task'
 
 const COLUMN_ORDER: ColumnId[] = ['design', 'frontend', 'backend', 'testing']
@@ -23,41 +23,49 @@ type FilterId = typeof FILTERS[number]['id']
 
 export default function Board() {
   const { isLoading, isError } = useFetchTasks()
-  const { state, dispatch } = useTaskContext()
+
+  // Zustand selectors — компонент танҳо вақти тағйири ин майдонҳо render мешавад
+  const tasks      = useTaskStore((s) => s.tasks)
+  const filter     = useTaskStore((s) => s.filter)
+  const totalTasks = useTaskStore((s) => s.totalTasks)
+  const setFilter  = useTaskStore((s) => s.setFilter)
+  const moveTask   = useTaskStore((s) => s.moveTask)
+  const updateTaskStore = useTaskStore((s) => s.updateTask)
+
   const createTask = useCreateTask()
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
 
-  const [modal, setModal]           = useState<ModalState | null>(null)
-  const [toast, setToast]           = useState('')
-  const [activeFilter, setFilter]   = useState<FilterId>('all')
+  const [modal, setModal]         = useState<ModalState | null>(null)
+  const [toast, setToast]         = useState('')
+  const [activeFilter, setActive] = useState<FilterId>('all')
 
   const showToast = useCallback((msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(''), 2200)
   }, [])
 
-  /* ── Filtering ─────────────────────────────────────────── */
+  /* ── Filtered columns ───────────────────────────────────── */
   const filteredColumns = useMemo(() => {
-    let tasks = state.tasks
+    let list = tasks
 
-    if (state.filter.search)
-      tasks = tasks.filter(t => t.title.toLowerCase().includes(state.filter.search.toLowerCase()))
+    if (filter.search)
+      list = list.filter((t) => t.title.toLowerCase().includes(filter.search.toLowerCase()))
 
-    if (activeFilter === 'completed') tasks = tasks.filter(t => t.completed)
-    else if (activeFilter === 'high')   tasks = tasks.filter(t => t.priority === 'high')
-    else if (activeFilter === 'medium') tasks = tasks.filter(t => t.priority === 'medium')
-    else if (activeFilter === 'low')    tasks = tasks.filter(t => t.priority === 'low')
+    if (activeFilter === 'completed') list = list.filter((t) => t.completed)
+    else if (activeFilter === 'high')   list = list.filter((t) => t.priority === 'high')
+    else if (activeFilter === 'medium') list = list.filter((t) => t.priority === 'medium')
+    else if (activeFilter === 'low')    list = list.filter((t) => t.priority === 'low')
 
     const cols: Record<ColumnId, Task[]> = { design: [], frontend: [], backend: [], testing: [] }
-    tasks.forEach(t => cols[t.columnId].push(t))
+    list.forEach((t) => cols[t.columnId].push(t))
     return cols
-  }, [state.tasks, state.filter.search, activeFilter])
+  }, [tasks, filter.search, activeFilter])
 
-  /* ── Stats ─────────────────────────────────────────────── */
-  const total      = state.tasks.length
-  const completed  = state.tasks.filter(t => t.completed).length
-  const highCount  = state.tasks.filter(t => t.priority === 'high').length
+  /* ── Stats ──────────────────────────────────────────────── */
+  const total      = tasks.length
+  const completed  = tasks.filter((t) => t.completed).length
+  const highCount  = tasks.filter((t) => t.priority === 'high').length
   const inProgress = total - completed
 
   /* ── Handlers ───────────────────────────────────────────── */
@@ -65,12 +73,9 @@ export default function Board() {
     const { destination, source, draggableId } = result
     if (!destination) return
     if (destination.droppableId === source.droppableId && destination.index === source.index) return
-    dispatch({
-      type: 'MOVE_TASK',
-      payload: { taskId: Number(draggableId), toColumn: destination.droppableId as ColumnId, toIndex: destination.index },
-    })
+    moveTask(Number(draggableId), destination.droppableId as ColumnId, destination.index)
     showToast('Task moved')
-  }, [dispatch, showToast])
+  }, [moveTask, showToast])
 
   const handleModalSave = useCallback((data: { title: string; priority: Priority; columnId: ColumnId }) => {
     if (!modal) return
@@ -81,12 +86,12 @@ export default function Board() {
     } else {
       const t = modal.task
       if (data.title    !== t.title)    updateTask.mutate({ id: t.id, title: data.title })
-      if (data.priority !== t.priority) dispatch({ type: 'UPDATE_TASK', payload: { id: t.id, updates: { priority: data.priority } } })
-      if (data.columnId !== t.columnId) dispatch({ type: 'UPDATE_TASK', payload: { id: t.id, updates: { columnId: data.columnId } } })
+      if (data.priority !== t.priority) updateTaskStore(t.id, { priority: data.priority })
+      if (data.columnId !== t.columnId) updateTaskStore(t.id, { columnId: data.columnId })
       showToast('Task updated')
     }
     setModal(null)
-  }, [modal, createTask, updateTask, dispatch, showToast])
+  }, [modal, createTask, updateTask, updateTaskStore, showToast])
 
   const handleDelete = useCallback((id: number) => {
     deleteTask.mutate(id)
@@ -94,10 +99,10 @@ export default function Board() {
   }, [deleteTask, showToast])
 
   const handleToggle = useCallback((id: number, completed: boolean) => {
-    dispatch({ type: 'UPDATE_TASK', payload: { id, updates: { completed } } })
+    updateTaskStore(id, { completed })
     updateTask.mutate({ id, completed })
     showToast(completed ? '✓ Task completed' : 'Task reopened')
-  }, [dispatch, updateTask, showToast])
+  }, [updateTaskStore, updateTask, showToast])
 
   /* ── Loading / Error ────────────────────────────────────── */
   if (isLoading) return <Spinner />
@@ -116,18 +121,16 @@ export default function Board() {
         <h1 style={{ fontSize: 20, fontWeight: 700, color: '#111', margin: 0 }}>📋 Movadex Project</h1>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Search */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, padding: '0 10px', height: 36 }}>
             <span style={{ color: '#9CA3AF', fontSize: 14 }}>🔍</span>
             <input
-              value={state.filter.search}
-              onChange={e => dispatch({ type: 'SET_FILTER', payload: { search: e.target.value } })}
+              value={filter.search}
+              onChange={(e) => setFilter({ search: e.target.value })}
               placeholder="Search..."
               style={{ border: 'none', outline: 'none', fontSize: 13, width: 150, background: 'transparent', fontFamily: 'inherit' }}
             />
           </div>
 
-          {/* Add Task */}
           <button
             onClick={() => setModal({ mode: 'add', defaultColumn: 'design' })}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: '#4F46E5', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}
@@ -144,7 +147,7 @@ export default function Board() {
           { label: 'Completed',     value: completed,  color: '#065F46' },
           { label: 'High priority', value: highCount,  color: '#991B1B' },
           { label: 'In progress',   value: inProgress, color: '#2563EB' },
-        ].map(s => (
+        ].map((s) => (
           <div key={s.label} style={{ background: '#fff', borderRadius: 8, padding: '10px 14px', border: '1px solid #F3F4F6' }}>
             <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 4 }}>{s.label}</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
@@ -154,10 +157,10 @@ export default function Board() {
 
       {/* ── Filter Pills ────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-        {FILTERS.map(f => (
+        {FILTERS.map((f) => (
           <button
             key={f.id}
-            onClick={() => setFilter(f.id)}
+            onClick={() => setActive(f.id)}
             style={{
               padding: '5px 14px', borderRadius: 20, border: '1px solid',
               borderColor: activeFilter === f.id ? '#4F46E5' : '#E5E7EB',
@@ -176,13 +179,13 @@ export default function Board() {
       {/* ── Kanban Board ────────────────────────────────────── */}
       <DragDropContext onDragEnd={handleDragEnd}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-          {COLUMN_ORDER.map(colId => (
+          {COLUMN_ORDER.map((colId) => (
             <Column
               key={colId}
               columnId={colId}
               tasks={filteredColumns[colId]}
-              onAdd={colId => setModal({ mode: 'add', defaultColumn: colId })}
-              onEdit={task  => setModal({ mode: 'edit', task })}
+              onAdd={(id) => setModal({ mode: 'add', defaultColumn: id })}
+              onEdit={(task) => setModal({ mode: 'edit', task })}
               onDelete={handleDelete}
               onToggle={handleToggle}
             />
@@ -190,15 +193,12 @@ export default function Board() {
         </div>
       </DragDropContext>
 
-      <Pagination />
+      {/* page ва totalTasks барои Pagination аз store мегираду мебарад */}
+      {Math.ceil(totalTasks / 20) > 1 && <Pagination />}
 
       {/* ── Modal ───────────────────────────────────────────── */}
       {modal && (
-        <TaskModal
-          modal={modal}
-          onClose={() => setModal(null)}
-          onSave={handleModalSave}
-        />
+        <TaskModal modal={modal} onClose={() => setModal(null)} onSave={handleModalSave} />
       )}
 
       <Toast message={toast} />
