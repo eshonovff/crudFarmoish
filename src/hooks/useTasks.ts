@@ -3,8 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchTodos, createTodo, updateTodo, deleteTodo } from '../services/api'
 import { useTaskStore, mapApiTodoToTask } from '../store/taskStore'
 import type { ColumnId, Priority } from '../types/task'
-
-const PAGE_SIZE = 20
+import { PAGE_SIZE } from '../constants'
 
 export function useFetchTasks() {
   const { page, setTasks } = useTaskStore()

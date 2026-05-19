@@ -1,16 +1,17 @@
-import { memo, useState } from 'react'
+import { memo } from 'react'
 import { Draggable } from '@hello-pangea/dnd'
+import { MessageSquare, Paperclip } from 'lucide-react'
 import type { Task, Priority } from '../../types/task'
 
-const PRIORITY_STYLES: Record<Priority, { bg: string; color: string }> = {
-  high:   { bg: '#FEE2E2', color: '#991B1B' },
-  medium: { bg: '#FEF3C7', color: '#92400E' },
-  low:    { bg: '#D1FAE5', color: '#065F46' },
+const PRIORITY_CLASS: Record<Priority, string> = {
+  high:   'bg-red-100 text-red-800',
+  medium: 'bg-amber-100 text-amber-800',
+  low:    'bg-green-100 text-green-800',
 }
 
-const AVATAR_BG    = ['#EDE9FE', '#DBEAFE', '#D1FAE5', '#FCE7F3', '#FEF3C7']
-const AVATAR_COLOR = ['#6D28D9', '#1D4ED8', '#065F46', '#9D174D', '#92400E']
-const AVATARS      = ['AR', 'MK', 'SO', 'JL', 'TP']
+const AVATAR_BG   = ['bg-violet-100', 'bg-blue-100', 'bg-green-100', 'bg-pink-100', 'bg-amber-100']
+const AVATAR_TEXT = ['text-violet-700', 'text-blue-700', 'text-green-700', 'text-pink-700', 'text-amber-700']
+const AVATARS     = ['AR', 'MK', 'SO', 'JL', 'TP']
 
 interface TaskCardProps {
   task: Task
@@ -21,8 +22,6 @@ interface TaskCardProps {
 }
 
 function TaskCard({ task, index, onEdit, onDelete, onToggle }: TaskCardProps) {
-  const [hover, setHover] = useState(false)
-  const p = PRIORITY_STYLES[task.priority]
   const ai = task.userId % 5
 
   return (
@@ -32,75 +31,54 @@ function TaskCard({ task, index, onEdit, onDelete, onToggle }: TaskCardProps) {
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          onMouseEnter={() => setHover(true)}
-          onMouseLeave={() => setHover(false)}
-          style={{
-            ...provided.draggableProps.style,
-            background: '#fff',
-            borderRadius: 8,
-            padding: '12px 14px',
-            marginBottom: 10,
-            border: hover || snapshot.isDragging ? '1px solid #C7D2FE' : '1px solid #F3F4F6',
-            cursor: snapshot.isDragging ? 'grabbing' : 'grab',
-            transition: 'border-color 0.15s',
-            opacity: snapshot.isDragging ? 0.85 : 1,
-            userSelect: 'none',
-            boxShadow: snapshot.isDragging ? '0 8px 24px rgba(0,0,0,0.12)' : 'none',
-          }}
+          className={`
+            group bg-white rounded-lg p-3.5 mb-2.5 border select-none
+            transition-all duration-150
+            ${snapshot.isDragging
+              ? 'shadow-xl border-indigo-200 rotate-1 scale-[1.02] cursor-grabbing'
+              : 'border-gray-100 hover:border-indigo-200 cursor-grab'
+            }
+          `}
         >
-          {/* Title */}
-          <div style={{
-            fontSize: 13,
-            fontWeight: 500,
-            color: '#111',
-            marginBottom: 10,
-            lineHeight: 1.45,
-            textDecoration: task.completed ? 'line-through' : 'none',
-            opacity: task.completed ? 0.45 : 1,
-          }}>
+          <p className={`text-[13px] font-medium leading-snug mb-2.5 ${
+            task.completed ? 'line-through opacity-40 text-gray-800' : 'text-gray-900'
+          }`}>
             {task.title}
-          </div>
+          </p>
 
-          {/* Footer */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            {/* Avatar + Priority */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{
-                width: 24, height: 24, borderRadius: '50%',
-                background: AVATAR_BG[ai], color: AVATAR_COLOR[ai],
-                fontSize: 10, fontWeight: 600,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0,
-              }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={`w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${AVATAR_BG[ai]} ${AVATAR_TEXT[ai]}`}>
                 {AVATARS[ai]}
               </div>
-              <span style={{
-                fontSize: 11, padding: '2px 8px', borderRadius: 10,
-                background: p.bg, color: p.color, fontWeight: 600,
-              }}>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold capitalize ${PRIORITY_CLASS[task.priority]}`}>
                 {task.priority}
               </span>
             </div>
 
-            {/* Hover actions */}
-            <div style={{
-              display: 'flex', gap: 2,
-              opacity: hover ? 1 : 0,
-              transition: 'opacity 0.15s',
-            }}>
-              <ActionBtn
-                title={task.completed ? 'Reopen' : 'Complete'}
-                color="#6B7280"
-                onClick={() => onToggle(task.id, !task.completed)}
-              >
+            <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+              <ActionBtn title={task.completed ? 'Reopen' : 'Complete'} textColor="text-gray-500"
+                onClick={() => onToggle(task.id, !task.completed)}>
                 {task.completed ? '↺' : '✓'}
               </ActionBtn>
-              <ActionBtn title="Edit" color="#6B7280" onClick={() => onEdit(task)}>
+              <ActionBtn title="Edit" textColor="text-gray-500" onClick={() => onEdit(task)}>
                 ✏
               </ActionBtn>
-              <ActionBtn title="Delete" color="#EF4444" onClick={() => onDelete(task.id)}>
+              <ActionBtn title="Delete" textColor="text-red-400" onClick={() => onDelete(task.id)}>
                 ✕
               </ActionBtn>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50">
+            <span className="text-[11px] text-gray-400">{task.date}</span>
+            <div className="flex items-center gap-2 text-gray-400">
+              <span className="flex items-center gap-0.5 text-[11px]">
+                <MessageSquare size={11} /> {task.comments}
+              </span>
+              <span className="flex items-center gap-0.5 text-[11px]">
+                <Paperclip size={11} /> {task.attachments}
+              </span>
             </div>
           </div>
         </div>
@@ -109,24 +87,17 @@ function TaskCard({ task, index, onEdit, onDelete, onToggle }: TaskCardProps) {
   )
 }
 
-function ActionBtn({
-  children, onClick, title, color,
-}: {
+function ActionBtn({ children, onClick, title, textColor }: {
   children: React.ReactNode
   onClick: () => void
   title: string
-  color: string
+  textColor: string
 }) {
   return (
     <button
       title={title}
       onClick={e => { e.stopPropagation(); onClick() }}
-      style={{
-        width: 26, height: 26, border: 'none', borderRadius: 4,
-        background: 'transparent', cursor: 'pointer',
-        fontSize: 13, color,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}
+      className={`w-[26px] h-[26px] flex items-center justify-center rounded text-[13px] bg-transparent border-none cursor-pointer hover:bg-gray-100 transition-colors ${textColor}`}
     >
       {children}
     </button>

@@ -37,7 +37,7 @@ interface TaskStore {
 
 export const useTaskStore = create<TaskStore>((set) => ({
   tasks:      [],
-  filter:     { search: '', priority: 'all' },
+  filter:     { search: '', activeFilter: 'all' },
   page:       0,
   totalTasks: 0,
 
@@ -65,7 +65,7 @@ export const useTaskStore = create<TaskStore>((set) => ({
       const rest     = without.filter((t) => t.columnId !== toColumn)
 
       inCol.splice(toIndex, 0, { ...task, columnId: toColumn })
-      return { tasks: [...rest, ...inCol] }
+      return { tasks: [...inCol, ...rest] }
     }),
 
   setFilter: (filter) =>

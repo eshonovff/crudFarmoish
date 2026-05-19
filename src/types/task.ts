@@ -2,6 +2,8 @@ export type Priority = 'high' | 'medium' | 'low'
 
 export type ColumnId = 'design' | 'frontend' | 'backend' | 'testing'
 
+export type ActiveFilter = Priority | 'all' | 'completed'
+
 export interface ApiTodo {
   id: number
   todo: string
@@ -28,13 +30,7 @@ export interface Task {
   attachments: number
 }
 
-export interface Column {
-  id: ColumnId
-  title: string
-  tasks: Task[]
-}
-
 export interface FilterState {
-  search: string
-  priority: Priority | 'all'
+  search:       string
+  activeFilter: ActiveFilter
 }

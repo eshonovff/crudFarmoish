@@ -7,68 +7,62 @@ import Pagination from '../UI/Pagination'
 import Toast from '../UI/Toast'
 import { useFetchTasks, useCreateTask, useUpdateTask, useDeleteTask } from '../../hooks/useTasks'
 import { useTaskStore } from '../../store/taskStore'
-import type { Task, ColumnId, Priority } from '../../types/task'
+import type { Task, ColumnId, Priority, ActiveFilter } from '../../types/task'
 
 const COLUMN_ORDER: ColumnId[] = ['design', 'frontend', 'backend', 'testing']
 
-const FILTERS = [
+const FILTERS: { id: ActiveFilter; label: string }[] = [
   { id: 'all',       label: 'All tasks' },
   { id: 'high',      label: 'High'      },
   { id: 'medium',    label: 'Medium'    },
   { id: 'low',       label: 'Low'       },
   { id: 'completed', label: 'Done'      },
-] as const
-
-type FilterId = typeof FILTERS[number]['id']
+]
 
 export default function Board() {
   const { isLoading, isError } = useFetchTasks()
 
-  // Zustand selectors — компонент танҳо вақти тағйири ин майдонҳо render мешавад
-  const tasks      = useTaskStore((s) => s.tasks)
-  const filter     = useTaskStore((s) => s.filter)
-  const totalTasks = useTaskStore((s) => s.totalTasks)
-  const setFilter  = useTaskStore((s) => s.setFilter)
-  const moveTask   = useTaskStore((s) => s.moveTask)
+  const tasks          = useTaskStore((s) => s.tasks)
+  const filter         = useTaskStore((s) => s.filter)
+  const totalTasks     = useTaskStore((s) => s.totalTasks)
+  const setFilter      = useTaskStore((s) => s.setFilter)
+  const moveTask       = useTaskStore((s) => s.moveTask)
   const updateTaskStore = useTaskStore((s) => s.updateTask)
 
   const createTask = useCreateTask()
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
 
-  const [modal, setModal]         = useState<ModalState | null>(null)
-  const [toast, setToast]         = useState('')
-  const [activeFilter, setActive] = useState<FilterId>('all')
+  const [modal, setModal] = useState<ModalState | null>(null)
+  const [toast, setToast] = useState('')
 
   const showToast = useCallback((msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(''), 2200)
   }, [])
 
-  /* ── Filtered columns ───────────────────────────────────── */
   const filteredColumns = useMemo(() => {
     let list = tasks
 
     if (filter.search)
       list = list.filter((t) => t.title.toLowerCase().includes(filter.search.toLowerCase()))
 
-    if (activeFilter === 'completed') list = list.filter((t) => t.completed)
-    else if (activeFilter === 'high')   list = list.filter((t) => t.priority === 'high')
-    else if (activeFilter === 'medium') list = list.filter((t) => t.priority === 'medium')
-    else if (activeFilter === 'low')    list = list.filter((t) => t.priority === 'low')
+    if (filter.activeFilter === 'completed') list = list.filter((t) => t.completed)
+    else if (filter.activeFilter === 'high')   list = list.filter((t) => t.priority === 'high')
+    else if (filter.activeFilter === 'medium') list = list.filter((t) => t.priority === 'medium')
+    else if (filter.activeFilter === 'low')    list = list.filter((t) => t.priority === 'low')
 
     const cols: Record<ColumnId, Task[]> = { design: [], frontend: [], backend: [], testing: [] }
     list.forEach((t) => cols[t.columnId].push(t))
     return cols
-  }, [tasks, filter.search, activeFilter])
+  }, [tasks, filter])
 
-  /* ── Stats ──────────────────────────────────────────────── */
-  const total      = tasks.length
-  const completed  = tasks.filter((t) => t.completed).length
-  const highCount  = tasks.filter((t) => t.priority === 'high').length
-  const inProgress = total - completed
+  const stats = useMemo(() => {
+    const completed = tasks.filter((t) => t.completed).length
+    const highCount = tasks.filter((t) => t.priority === 'high').length
+    return { total: tasks.length, completed, highCount, inProgress: tasks.length - completed }
+  }, [tasks])
 
-  /* ── Handlers ───────────────────────────────────────────── */
   const handleDragEnd = useCallback((result: DropResult) => {
     const { destination, source, draggableId } = result
     if (!destination) return
@@ -81,11 +75,21 @@ export default function Board() {
     if (!modal) return
 
     if (modal.mode === 'add') {
-      createTask.mutate({ title: data.title, columnId: data.columnId, priority: data.priority })
-      showToast('Task added')
+      createTask.mutate(
+        { title: data.title, columnId: data.columnId, priority: data.priority },
+        {
+          onSuccess: () => showToast('Task added'),
+          onError:   () => showToast('❌ Failed to add task'),
+        }
+      )
     } else {
       const t = modal.task
-      if (data.title    !== t.title)    updateTask.mutate({ id: t.id, title: data.title })
+      if (data.title !== t.title) {
+        updateTask.mutate(
+          { id: t.id, title: data.title },
+          { onError: () => showToast('❌ Failed to update title') }
+        )
+      }
       if (data.priority !== t.priority) updateTaskStore(t.id, { priority: data.priority })
       if (data.columnId !== t.columnId) updateTaskStore(t.id, { columnId: data.columnId })
       showToast('Task updated')
@@ -94,91 +98,89 @@ export default function Board() {
   }, [modal, createTask, updateTask, updateTaskStore, showToast])
 
   const handleDelete = useCallback((id: number) => {
-    deleteTask.mutate(id)
-    showToast('Task deleted')
+    deleteTask.mutate(id, {
+      onSuccess: () => showToast('Task deleted'),
+      onError:   () => showToast('❌ Failed to delete task'),
+    })
   }, [deleteTask, showToast])
 
   const handleToggle = useCallback((id: number, completed: boolean) => {
-    updateTaskStore(id, { completed })
-    updateTask.mutate({ id, completed })
-    showToast(completed ? '✓ Task completed' : 'Task reopened')
+    updateTaskStore(id, { completed })                    // optimistic update
+    updateTask.mutate({ id, completed }, {
+      onSuccess: () => showToast(completed ? '✓ Task completed' : 'Task reopened'),
+      onError:   () => {
+        updateTaskStore(id, { completed: !completed })    // rollback
+        showToast('❌ Failed to update task')
+      },
+    })
   }, [updateTaskStore, updateTask, showToast])
 
-  /* ── Loading / Error ────────────────────────────────────── */
   if (isLoading) return <Spinner />
 
   if (isError) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F3F4F6' }}>
-      <p style={{ color: '#EF4444', fontWeight: 500 }}>Failed to load tasks. Check your connection.</p>
+    <div className="flex items-center justify-center h-screen bg-gray-100">
+      <p className="text-red-500 font-medium">Failed to load tasks. Check your connection.</p>
     </div>
   )
 
   return (
-    <div style={{ fontFamily: "'Inter', -apple-system, sans-serif", background: '#F3F4F6', minHeight: '100vh', padding: 20 }}>
+    <div className="min-h-screen bg-gray-100 p-5">
 
-      {/* ── Header ─────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: '#111', margin: 0 }}>📋 Movadex Project</h1>
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+        <h1 className="text-xl font-bold text-gray-900">📋 Movadex Project</h1>
 
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, padding: '0 10px', height: 36 }}>
-            <span style={{ color: '#9CA3AF', fontSize: 14 }}>🔍</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2.5 h-9">
+            <span className="text-gray-400 text-sm">🔍</span>
             <input
               value={filter.search}
               onChange={(e) => setFilter({ search: e.target.value })}
               placeholder="Search..."
-              style={{ border: 'none', outline: 'none', fontSize: 13, width: 150, background: 'transparent', fontFamily: 'inherit' }}
+              className="border-none outline-none text-[13px] w-36 bg-transparent"
             />
           </div>
 
           <button
             onClick={() => setModal({ mode: 'add', defaultColumn: 'design' })}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: '#4F46E5', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}
+            className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700 transition-colors cursor-pointer border-none"
           >
             + Add Task
           </button>
         </div>
       </div>
 
-      {/* ── Stats ──────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
         {[
-          { label: 'Total',         value: total,      color: '#374151' },
-          { label: 'Completed',     value: completed,  color: '#065F46' },
-          { label: 'High priority', value: highCount,  color: '#991B1B' },
-          { label: 'In progress',   value: inProgress, color: '#2563EB' },
+          { label: 'Total',         value: stats.total,      color: 'text-gray-700'   },
+          { label: 'Completed',     value: stats.completed,  color: 'text-green-800'  },
+          { label: 'High priority', value: stats.highCount,  color: 'text-red-800'    },
+          { label: 'In progress',   value: stats.inProgress, color: 'text-blue-700'   },
         ].map((s) => (
-          <div key={s.label} style={{ background: '#fff', borderRadius: 8, padding: '10px 14px', border: '1px solid #F3F4F6' }}>
-            <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 4 }}>{s.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
+          <div key={s.label} className="bg-white rounded-lg p-3 border border-gray-100">
+            <p className="text-[11px] text-gray-400 mb-1">{s.label}</p>
+            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
           </div>
         ))}
       </div>
 
-      {/* ── Filter Pills ────────────────────────────────────── */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div className="flex flex-wrap gap-1.5 mb-4">
         {FILTERS.map((f) => (
           <button
             key={f.id}
-            onClick={() => setActive(f.id)}
-            style={{
-              padding: '5px 14px', borderRadius: 20, border: '1px solid',
-              borderColor: activeFilter === f.id ? '#4F46E5' : '#E5E7EB',
-              background:  activeFilter === f.id ? '#4F46E5' : '#fff',
-              color:       activeFilter === f.id ? '#fff'    : '#6B7280',
-              fontSize: 12, cursor: 'pointer',
-              fontWeight: activeFilter === f.id ? 600 : 400,
-              fontFamily: 'inherit',
-            }}
+            onClick={() => setFilter({ activeFilter: f.id })}
+            className={`px-3.5 py-1 rounded-full border text-xs cursor-pointer transition-colors ${
+              filter.activeFilter === f.id
+                ? 'bg-indigo-600 border-indigo-600 text-white font-semibold'
+                : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+            }`}
           >
             {f.label}
           </button>
         ))}
       </div>
-
-      {/* ── Kanban Board ────────────────────────────────────── */}
+ 
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5">
           {COLUMN_ORDER.map((colId) => (
             <Column
               key={colId}
@@ -193,10 +195,8 @@ export default function Board() {
         </div>
       </DragDropContext>
 
-      {/* page ва totalTasks барои Pagination аз store мегираду мебарад */}
       {Math.ceil(totalTasks / 20) > 1 && <Pagination />}
 
-      {/* ── Modal ───────────────────────────────────────────── */}
       {modal && (
         <TaskModal modal={modal} onClose={() => setModal(null)} onSave={handleModalSave} />
       )}

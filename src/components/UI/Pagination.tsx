@@ -1,7 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useTaskStore } from '../../store/taskStore'
-
-const PAGE_SIZE = 20
+import { PAGE_SIZE } from '../../constants'
 
 export default function Pagination() {
   const page       = useTaskStore((s) => s.page)

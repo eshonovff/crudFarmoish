@@ -2,11 +2,11 @@ import { Droppable } from '@hello-pangea/dnd'
 import TaskCard from '../Card/TaskCard'
 import type { Task, ColumnId } from '../../types/task'
 
-const COL_CONFIG: Record<ColumnId, { label: string; color: string; bg: string }> = {
-  design:   { label: 'Design',    color: '#7C3AED', bg: '#F5F3FF' },
-  frontend: { label: 'Front-End', color: '#2563EB', bg: '#EFF6FF' },
-  backend:  { label: 'Back-End',  color: '#D97706', bg: '#FFFBEB' },
-  testing:  { label: 'Testing',   color: '#DC2626', bg: '#FEF2F2' },
+const COL_CONFIG: Record<ColumnId, { label: string; color: string; bg: string; titleClass: string }> = {
+  design:   { label: 'Design',    color: '#7C3AED', bg: '#F5F3FF', titleClass: 'text-violet-600' },
+  frontend: { label: 'Front-End', color: '#2563EB', bg: '#EFF6FF', titleClass: 'text-blue-600'   },
+  backend:  { label: 'Back-End',  color: '#D97706', bg: '#FFFBEB', titleClass: 'text-amber-600'  },
+  testing:  { label: 'Testing',   color: '#DC2626', bg: '#FEF2F2', titleClass: 'text-red-600'    },
 }
 
 interface ColumnProps {
@@ -27,53 +27,35 @@ export default function Column({ columnId, tasks, onAdd, onEdit, onDelete, onTog
         <div
           ref={provided.innerRef}
           {...provided.droppableProps}
+          className="rounded-xl p-3.5 flex flex-col min-h-[380px] border transition-all duration-150"
           style={{
-            background: snapshot.isDraggingOver ? col.bg : '#F9FAFB',
-            borderRadius: 12,
-            padding: 14,
-            minHeight: 380,
-            border: snapshot.isDraggingOver
-              ? `2px dashed ${col.color}`
-              : '1px solid #F3F4F6',
-            borderTop: `3px solid ${col.color}`,
-            display: 'flex',
-            flexDirection: 'column',
-            transition: 'border 0.15s, background 0.15s',
+            borderTopWidth: 3,
+            borderTopColor: col.color,
+            background:     snapshot.isDraggingOver ? col.bg    : '#F9FAFB',
+            borderColor:    snapshot.isDraggingOver ? col.color : '#F3F4F6',
+            borderStyle:    snapshot.isDraggingOver ? 'dashed'  : 'solid',
+            borderTopStyle: 'solid',
           }}
         >
-          {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: col.color }}>
+          <div className="flex items-center justify-between mb-3">
+            <div className={`flex items-center gap-2 text-sm font-semibold ${col.titleClass}`}>
               {col.label}
-              <span style={{
-                background: '#E5E7EB', borderRadius: 12,
-                padding: '2px 8px', fontSize: 11, color: '#6B7280', fontWeight: 400,
-              }}>
+              <span className="bg-gray-200 text-gray-500 text-[11px] font-normal rounded-full px-2 py-0.5">
                 {tasks.length}
               </span>
             </div>
             <button
               onClick={() => onAdd(columnId)}
-              style={{
-                width: 28, height: 28, borderRadius: 6,
-                border: '1px solid #E5E7EB', background: '#fff',
-                cursor: 'pointer', fontSize: 18, color: '#6B7280',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                lineHeight: 1,
-              }}
+              className="w-7 h-7 rounded-md border border-gray-200 bg-white text-gray-500 text-lg leading-none flex items-center justify-center hover:bg-gray-50 transition-colors cursor-pointer"
             >
               +
             </button>
           </div>
 
-          {/* Task list */}
-          <div style={{ flex: 1 }}>
+          <div className="flex-1">
             {tasks.length === 0 && !snapshot.isDraggingOver && (
-              <div style={{
-                textAlign: 'center', padding: '2rem 1rem',
-                color: '#9CA3AF', fontSize: 12,
-              }}>
-                <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.4 }}>📋</div>
+              <div className="flex flex-col items-center justify-center h-24 text-gray-400 text-xs gap-2">
+                <span className="text-3xl opacity-40">📋</span>
                 No tasks
               </div>
             )}
@@ -90,17 +72,9 @@ export default function Column({ columnId, tasks, onAdd, onEdit, onDelete, onTog
             {provided.placeholder}
           </div>
 
-          {/* Add new task */}
           <button
             onClick={() => onAdd(columnId)}
-            style={{
-              marginTop: 8, padding: 10,
-              border: '1.5px dashed #E5E7EB', borderRadius: 8,
-              background: 'transparent', cursor: 'pointer',
-              fontSize: 13, color: '#9CA3AF',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              fontFamily: 'inherit',
-            }}
+            className="mt-2 w-full py-2.5 border-2 border-dashed border-gray-200 rounded-lg text-[13px] text-gray-400 flex items-center justify-center gap-1.5 hover:border-gray-300 hover:text-gray-500 transition-colors cursor-pointer bg-transparent"
           >
             + Add new task
           </button>
