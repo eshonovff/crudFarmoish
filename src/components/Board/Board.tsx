@@ -2,12 +2,13 @@ import { useState, useCallback, useMemo } from 'react'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import Column from './Column'
 import TaskModal, { type ModalState } from '../Card/TaskModal'
-import Spinner from '../UI/Spinner'
 import Pagination from '../UI/Pagination'
 import Toast from '../UI/Toast'
 import { useFetchTasks, useCreateTask, useUpdateTask, useDeleteTask } from '../../hooks/useTasks'
 import { useTaskStore } from '../../store/taskStore'
 import type { Task, ColumnId, Priority, ActiveFilter } from '../../types/task'
+
+const SKELETON_COLORS = ['#7C3AED', '#2563EB', '#D97706', '#DC2626']
 
 const COLUMN_ORDER: ColumnId[] = ['design', 'frontend', 'backend', 'testing']
 
@@ -115,7 +116,21 @@ export default function Board() {
     })
   }, [updateTaskStore, updateTask, showToast])
 
-  if (isLoading) return <Spinner />
+  if (isLoading) return (
+    <div className="min-h-screen bg-gray-100 p-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5">
+        {SKELETON_COLORS.map((color) => (
+          <div key={color} className="rounded-xl p-3.5 bg-[#F9FAFB] border border-gray-100"
+            style={{ borderTopWidth: 3, borderTopColor: color }}>
+            <div className="h-4 bg-gray-200 rounded w-3/5 mb-4 animate-pulse" />
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-20 bg-white rounded-lg mb-2.5 animate-pulse" />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 
   if (isError) return (
     <div className="flex items-center justify-center h-screen bg-gray-100">
@@ -154,7 +169,7 @@ export default function Board() {
           { label: 'Total',         value: stats.total,      color: 'text-gray-700'   },
           { label: 'Completed',     value: stats.completed,  color: 'text-green-800'  },
           { label: 'High priority', value: stats.highCount,  color: 'text-red-800'    },
-          { label: 'In progress',   value: stats.inProgress, color: 'text-blue-700'   },
+          { label: 'In progress',   value: stats.inProgress, color: 'text-blue-600'   },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-lg p-3 border border-gray-100">
             <p className="text-[11px] text-gray-400 mb-1">{s.label}</p>

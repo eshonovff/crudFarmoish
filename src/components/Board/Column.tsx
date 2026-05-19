@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import { Droppable } from '@hello-pangea/dnd'
 import TaskCard from '../Card/TaskCard'
 import type { Task, ColumnId } from '../../types/task'
+
+const COL_PAGE = 4
 
 const COL_CONFIG: Record<ColumnId, { label: string; color: string; bg: string; titleClass: string }> = {
   design:   { label: 'Design',    color: '#7C3AED', bg: '#F5F3FF', titleClass: 'text-violet-600' },
@@ -20,6 +23,11 @@ interface ColumnProps {
 
 export default function Column({ columnId, tasks, onAdd, onEdit, onDelete, onToggle }: ColumnProps) {
   const col = COL_CONFIG[columnId]
+  const [visible, setVisible] = useState(COL_PAGE)
+
+  const shown   = tasks.slice(0, visible)
+  const hasMore = tasks.length > visible
+  const hidden  = tasks.length - visible
 
   return (
     <Droppable droppableId={columnId}>
@@ -29,12 +37,12 @@ export default function Column({ columnId, tasks, onAdd, onEdit, onDelete, onTog
           {...provided.droppableProps}
           className="rounded-xl p-3.5 flex flex-col min-h-[380px] border transition-all duration-150"
           style={{
-            borderTopWidth: 3,
-            borderTopColor: col.color,
-            background:     snapshot.isDraggingOver ? col.bg    : '#F9FAFB',
-            borderColor:    snapshot.isDraggingOver ? col.color : '#F3F4F6',
-            borderStyle:    snapshot.isDraggingOver ? 'dashed'  : 'solid',
-            borderTopStyle: 'solid',
+            borderTopWidth:  3,
+            borderTopColor:  col.color,
+            background:      snapshot.isDraggingOver ? col.bg    : '#F9FAFB',
+            borderColor:     snapshot.isDraggingOver ? col.color : '#F3F4F6',
+            borderStyle:     snapshot.isDraggingOver ? 'dashed'  : 'solid',
+            borderTopStyle:  'solid',
           }}
         >
           <div className="flex items-center justify-between mb-3">
@@ -53,13 +61,13 @@ export default function Column({ columnId, tasks, onAdd, onEdit, onDelete, onTog
           </div>
 
           <div className="flex-1">
-            {tasks.length === 0 && !snapshot.isDraggingOver && (
+            {shown.length === 0 && !snapshot.isDraggingOver && (
               <div className="flex flex-col items-center justify-center h-24 text-gray-400 text-xs gap-2">
                 <span className="text-3xl opacity-40">📋</span>
                 No tasks
               </div>
             )}
-            {tasks.map((task, index) => (
+            {shown.map((task, index) => (
               <TaskCard
                 key={task.id}
                 task={task}
@@ -72,9 +80,18 @@ export default function Column({ columnId, tasks, onAdd, onEdit, onDelete, onTog
             {provided.placeholder}
           </div>
 
+          {hasMore && (
+            <button
+              onClick={() => setVisible((v) => v + COL_PAGE)}
+              className="mt-1 mb-2 w-full py-1.5 text-[12px] text-gray-400 bg-transparent border-none cursor-pointer hover:text-gray-600 transition-colors"
+            >
+              ▼ Show more ({hidden})
+            </button>
+          )}
+
           <button
             onClick={() => onAdd(columnId)}
-            className="mt-2 w-full py-2.5 border-2 border-dashed border-gray-200 rounded-lg text-[13px] text-gray-400 flex items-center justify-center gap-1.5 hover:border-gray-300 hover:text-gray-500 transition-colors cursor-pointer bg-transparent"
+            className="mt-auto py-2.5 border-2 border-dashed border-gray-200 rounded-lg text-[13px] text-gray-400 flex items-center justify-center gap-1.5 hover:border-gray-300 hover:text-gray-500 transition-colors cursor-pointer bg-transparent"
           >
             + Add new task
           </button>
